@@ -16,6 +16,10 @@ Object.defineProperty(navigator,'languages',{get:()=>['en-US','en']});
 # Persistent browser contexts cannot open the same profile concurrently.
 _PROFILE_LOCK = asyncio.Lock()
 
+def _proxy():
+    url = os.getenv("PROXY_URL")
+    return {"server": url} if url else None
+
 async def pause(lo=None, hi=None):
     c = config.load()["budget"]
     lo = lo or c["pause_min_ms"]
@@ -29,6 +33,7 @@ class Session:
         self.ctx = None
         self.page = None
         self.last_status = None
+        self.last_url = None
         self.block_signal = None
 
     async def __aenter__(self):
@@ -38,11 +43,18 @@ class Session:
             self.ctx = await self._pw.chromium.launch_persistent_context(
                 self.profile,
                 headless=os.getenv("HEADLESS", "1") == "1",
+                channel="chromium",
                 user_agent=UA,
                 viewport={"width": 1280, "height": 900},
                 locale="en-US",
                 timezone_id=os.getenv("TZ_ID", "America/New_York"),
-                args=["--disable-blink-features=AutomationControlled"],
+                proxy=_proxy(),
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-features=IsolateOrigins,site-per-process",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                ],
             )
             await self.ctx.add_init_script(STEALTH_JS)
             self.page = self.ctx.pages[0] if self.ctx.pages else await self.ctx.new_page()
@@ -72,16 +84,16 @@ class Session:
     async def goto(self, url, wait="domcontentloaded"):
         response = await self.page.goto(url, wait_until=wait, timeout=45000)
         self.last_status = response.status if response else None
+        self.last_url = self.page.url
         await pause(900, 2200)
 
     async def logged_in(self):
         import health
         await self.goto("https://x.com/home")
-        self.block_signal = await health.probe(self.page, self.last_status)
+        self.block_signal = await health.probe(self.page, self.last_status, self.last_url)
         url = self.page.url
         if self.block_signal:
-            print("  !! X session blocked: %s (url=%s)" %
-                  (self.block_signal, url))
+            print("  !! X session blocked: %s (url=%s)" % (self.block_signal, url))
             return False
         if "/login" in url or "i/flow/login" in url:
             self.block_signal = "login"
