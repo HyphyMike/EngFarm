@@ -27,4 +27,4 @@ class Budget:
         async with self.lock:
             self.res["h"] = max(0, self.res["h"] - n)
             self.res["d"] = max(0, self.res["d"] - n)
-            self.store.add_actions(n)
+            self.store.add_actions(max(1, int(n + 0.999999)))

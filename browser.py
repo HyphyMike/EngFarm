@@ -72,7 +72,18 @@ class Session:
 
     async def logged_in(self):
         await self.goto("https://x.com/home")
-        return "/login" not in self.page.url and "i/flow/login" not in self.page.url
+        url = self.page.url
+        if "/login" in url or "i/flow/login" in url:
+            return False
+        try:
+            body = await self.page.locator("body").inner_text(timeout=5000)
+        except Exception:
+            body = ""
+        if not body.strip():
+            print("  !! X returned a blank page (url=%s title=%s)" %
+                  (url, await self.page.title()))
+            return False
+        return True
 
     async def type_like_human(self, text):
         for ch in text:

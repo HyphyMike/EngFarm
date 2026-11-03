@@ -86,6 +86,10 @@ async def emit(s, store, text, fmt, trend=None, arm=None):
         print("  (topic cooldown)")
         return False
 
+    if os.getenv("DRY_RUN") == "1":
+        print("  [DRY] preview/%s: %s" % (fmt, out))
+        return True
+
     oid = outbox.intend(store, out, fmt, trend)
     handle = config.load()["account_handle"]
     try:

@@ -27,8 +27,9 @@ async def run(s, store):
         take = await llm.trend_take(t["name"], store.recent_texts(6))
         if take and not store.seen_text(take):
             handle = config.load()["account_handle"]
-            await actions.post(s, take, handle)
-            store.add_post(take, "trend_take", trend=t["name"])
+            result = await actions.post(s, take, handle)
+            if result and result.get("id"):
+                store.add_post(take, "trend_take", tid=result["id"], trend=t["name"])
 
         cands = await scrape_search(s, t["name"], 20)
         cands = [c for c in cands if c["handle"].lower() != config.load()["account_handle"].lower()
@@ -47,6 +48,7 @@ async def run(s, store):
             if not txt or store.seen_text(txt):
                 continue
             print("  [TREND REPLY] @%s: %s" % (c["handle"], txt))
-            await actions.reply(s, c["id"], txt, config.load()["account_handle"])
-            store.add_reply(c["id"], "trend_reply", trend=t["name"])
+            result = await actions.reply(s, c["id"], txt, config.load()["account_handle"])
+            if result and result.get("id"):
+                store.add_reply(result["id"], "trend_reply", trend=t["name"])
             await asyncio.sleep(random.uniform(45, 130))

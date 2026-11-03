@@ -21,7 +21,9 @@ async def publish(s, store, chain):
     await pause(8000, 18000)
     for beat in chain[1:]:
         try:
-            await actions.reply(s, root, beat, handle)
+            result = await actions.reply(s, root, beat, handle)
+            if not result or not result.get("id"):
+                return root
             store.advance_chain(root)
             await pause(8000, 18000)
         except Exception as e:
@@ -36,7 +38,9 @@ async def repair(s, store):
         beats = json.loads(beats)
         for beat in beats[cursor:]:
             try:
-                await actions.reply(s, root, beat, handle)
+                result = await actions.reply(s, root, beat, handle)
+                if not result or not result.get("id"):
+                    return
                 store.advance_chain(root)
                 await pause(9000, 17000)
             except Exception:

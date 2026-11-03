@@ -30,8 +30,9 @@ async def run(s, store):
             continue
 
         print("  [CONVO d%d %s] @%s: %s" % (depth, st, m["handle"], txt))
-        await actions.reply(s, m["id"], txt, __import__("config").load()["account_handle"])
-        store.add_reply(m["id"], "conversation")
-        store.bump_depth(m["id"])
-        store.bump_relationship(m["handle"], 1.0)
+        result = await actions.reply(s, m["id"], txt, __import__("config").load()["account_handle"])
+        if result and result.get("id"):
+            store.add_reply(result["id"], "conversation")
+            store.bump_depth(m["id"])
+            store.bump_relationship(m["handle"], 1.0)
         await asyncio.sleep(random.uniform(40, 150))

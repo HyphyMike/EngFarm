@@ -65,6 +65,9 @@ async def _send(s, text):
     return True
 
 async def post(s, text, handle):
+    if DRY():
+        print("  [DRY] post: " + text)
+        return {"dry_run": True, "text": text}
     await s.goto("https://x.com/compose/post")
     await pause(1200, 2000)
     if not await _send(s, text):
@@ -75,6 +78,9 @@ async def post(s, text, handle):
     return {"id": tid} if tid else None
 
 async def post_with_media(s, text, path, handle, alt=""):
+    if DRY():
+        print("  [DRY] post with media: " + text)
+        return {"dry_run": True, "text": text}
     await s.goto("https://x.com/compose/post")
     await pause(1200, 2000)
     await s.page.locator('input[type="file"]').first.set_input_files(path)
@@ -96,6 +102,9 @@ async def post_with_media(s, text, path, handle, alt=""):
     return {"id": tid} if tid else None
 
 async def reply(s, tid, text, handle):
+    if DRY():
+        print("  [DRY] reply to %s: %s" % (tid, text))
+        return {"dry_run": True, "text": text}
     await s.goto("https://x.com/i/status/" + tid)
     await s.page.locator('[data-testid="reply"]').first.click()
     await pause(1200, 2400)
@@ -107,6 +116,9 @@ async def reply(s, tid, text, handle):
     return {"id": new} if new else None
 
 async def quote(s, tid, text, handle):
+    if DRY():
+        print("  [DRY] quote %s: %s" % (tid, text))
+        return {"dry_run": True, "text": text}
     await s.goto("https://x.com/i/status/" + tid)
     await pause(1400, 2300)
     await s.page.locator('[data-testid="retweet"]').first.click()
@@ -121,6 +133,9 @@ async def quote(s, tid, text, handle):
     return {"id": new} if new else None
 
 async def pin(s, tid):
+    if DRY():
+        print("  [DRY] pin: " + tid)
+        return False
     await s.goto("https://x.com/i/status/" + tid)
     await pause(1400, 2400)
     try:
@@ -132,25 +147,25 @@ async def pin(s, tid):
         print("  !! pin: %s" % e)
 
 async def follow(s, handle):
+    if DRY():
+        print("  [DRY] follow @" + handle)
+        return False
     await s.goto("https://x.com/" + handle)
     btn = s.page.locator('[data-testid$="-follow"]').first
     if not await btn.count():
         return False
-    if DRY():
-        print("  [DRY] follow @" + handle)
-        return True
     await btn.click()
     await pause(900, 1800)
     return True
 
 async def unfollow(s, handle):
+    if DRY():
+        print("  [DRY] unfollow @" + handle)
+        return False
     await s.goto("https://x.com/" + handle)
     btn = s.page.locator('[data-testid$="-unfollow"]').first
     if not await btn.count():
         return False
-    if DRY():
-        print("  [DRY] unfollow @" + handle)
-        return True
     await btn.click()
     await pause(500, 1000)
     try:

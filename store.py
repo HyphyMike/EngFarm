@@ -13,6 +13,9 @@ class Store:
         self.c.execute("PRAGMA synchronous=NORMAL")
         with self._lock:
             self.c.executescript(SCHEMA)
+            cols = {r[1] for r in self.c.execute("PRAGMA table_info(peer_posts)")}
+            if "text_len" not in cols:
+                self.c.execute("ALTER TABLE peer_posts ADD COLUMN text_len INT")
             self.c.commit()
 
     def w(self, sql, args=()):
@@ -104,12 +107,13 @@ class Store:
                 for (v,) in self.q("SELECT vec FROM vectors ORDER BY ts DESC LIMIT ?", (n,))]
 
     def save_peer_post(self, h, text, vec):
-        self.w("INSERT OR REPLACE INTO peer_posts VALUES (?,?,?,?)",
-               (self._h(text), h, vec.tobytes(), time.time()))
+        self.w("INSERT OR REPLACE INTO peer_posts (hash, handle, vec, ts, text_len) "
+               "VALUES (?,?,?,?,?)",
+               (self._h(text), h, vec.tobytes(), time.time(), len(text)))
 
     def recent_peer_vectors(self, n):
-        return [(len(t), np.frombuffer(v, dtype=np.float32)) for t, v in
-                self.q("SELECT text, vec FROM peer_posts ORDER BY ts DESC LIMIT ?", (n,))]
+        return [(length or 0, np.frombuffer(v, dtype=np.float32)) for length, v in
+                self.q("SELECT text_len, vec FROM peer_posts ORDER BY ts DESC LIMIT ?", (n,))]
 
     def add_cooldown(self, key, vec):
         self.w("INSERT OR REPLACE INTO cooldowns VALUES (?,?,?)",

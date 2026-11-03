@@ -1,11 +1,14 @@
 import pathlib, sys
 
-FLAG = pathlib.Path("PAUSE")
+FLAG = pathlib.Path("PAUSE") / "STOP"
+
 
 def engaged():
-    return FLAG.exists()
+    return FLAG.is_file()
+
 
 def trip(reason=""):
+    FLAG.parent.mkdir(parents=True, exist_ok=True)
     FLAG.write_text(reason)
 
 def release():

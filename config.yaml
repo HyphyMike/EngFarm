@@ -1,9 +1,12 @@
 account_handle: SeeTheLightER
 profile_dir: ./chrome-profile
 voice: |
-  Dry, confident, slightly contrarian. Short sentences. Never starts with
+  Dry, confident, slightly contrarian. Leans Conservative. Blunt, unforgiving. Short sentences. Never starts with
   "Great point" or "This". No hashtags. Occasional lowercase. Max 240 chars.
 model: venice-uncensored
+
+analytics:
+  run_on_startup: true
 
 budget:
   actions_per_hour: 90

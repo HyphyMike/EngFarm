@@ -13,7 +13,7 @@ SELECTORS = {
     "usercell": ['[data-testid="UserCell"]', 'div[data-testid="cellInnerDiv"]'],
     "analytics": ['[aria-label*="View post analytics"]'],
     "bookmark": ['[data-testid="bookmark"]'],
-    "notification": ['[data-testid="notification"]', 'article[role="article"]'],
+    "notification": ['[data-testid="notification"]', 'article[data-testid="tweet"]', 'article[role="article"]'],
 }
 
 QUARANTINE_AFTER = 2
@@ -26,12 +26,26 @@ async def pick(store, page, name):
         if await loc.count():
             store.bump_sel(name, True)
             return loc
+    try:
+        body_text = await page.locator("body").inner_text(timeout=3000)
+    except Exception:
+        body_text = ""
+    if not body_text.strip():
+        await dump(page, name)
+        print("  !! %s page is blank; selector check skipped (url=%s title=%s)" %
+              (name, page.url, await page.title()))
+        return None
+
     store.bump_sel(name, False)
     if store.sel_failures(name) >= QUARANTINE_AFTER:
         store.set_kv("quarantine:" + name, "1")
         print("  !! %s quarantined" % name)
     await dump(page, name)
     return None
+
+def reset_selector_quarantine(store, name):
+    store.del_kv("quarantine:" + name)
+    store.w("UPDATE sel_stats SET fail=0 WHERE name=?", (name,))
 
 def release_quarantine(store):
     for (k,) in store.q("SELECT k FROM kv WHERE k LIKE 'quarantine:%'"):
@@ -40,7 +54,9 @@ def release_quarantine(store):
 async def dump(page, name):
     d = pathlib.Path("dom")
     d.mkdir(exist_ok=True)
-    (d / ("%s-%d.html" % (name, int(time.time())))).write_text(await page.content())
+    html = await page.content()
+    metadata = "<!-- url=%s title=%s -->\n" % (await page.url, await page.title())
+    (d / ("%s-%d.html" % (name, int(time.time())))).write_text(metadata + html)
 
 async def healthy(page):
     body = await page.content()

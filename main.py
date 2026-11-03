@@ -1,4 +1,4 @@
-import asyncio, os, random
+import asyncio, os, random, traceback
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 
@@ -68,6 +68,7 @@ async def lane(name, jobs_list, prime=True):
                     await asyncio.sleep(random.uniform(25, 95))
         except Exception as e:
             print("  !! lane %s: %s: %s" % (name, type(e).__name__, e))
+            traceback.print_exc()
 
 async def cycle():
     import journal
@@ -133,11 +134,15 @@ def reset_backoff():
 async def main():
     import llm
     llm.bind(STORE)
+    health.reset_selector_quarantine(STORE, "notification")
     STORE.snapshot()
     print("startup planning")
     await jobs.plan(STORE)
     print("startup cycle")
     await cycle()
+    if config.load().get("analytics", {}).get("run_on_startup", False):
+        print("startup analytics")
+        await cycle_analytics()
 
     sched = AsyncIOScheduler()
     sched.add_job(cycle, "interval", minutes=22)
