@@ -17,6 +17,36 @@ SELECTORS = {
 }
 
 QUARANTINE_AFTER = 2
+COOLDOWN = {"http403": 3600, "ratelimit": 1800, "captcha": 1200,
+            "empty": 900, "neterr": 300, "error_toast": 600}
+
+async def probe(page, status=None):
+    """Classify an already-loaded page; never retries a blocked request."""
+    if status == 403:
+        return "http403"
+    if status == 429:
+        return "ratelimit"
+    html = await page.content()
+    lower = html.lower()
+    if "arkose" in lower or "captcha" in lower:
+        return "captcha"
+    if "rate limit exceeded" in lower:
+        return "ratelimit"
+    if "something went wrong" in lower:
+        return "error_toast"
+    try:
+        body = await page.locator("body").inner_text(timeout=5000)
+    except Exception:
+        body = ""
+    if len(body.strip()) < 40:
+        return "empty"
+    return None
+
+def set_cooldown(store, signature):
+    seconds = COOLDOWN.get(signature)
+    if seconds:
+        store.set_kv("cooldown_until", str(time.time() + seconds))
+        store.set_kv("cooldown_reason", signature)
 
 async def pick(store, page, name):
     if store.kv("quarantine:" + name):
@@ -55,18 +85,11 @@ async def dump(page, name):
     d = pathlib.Path("dom")
     d.mkdir(exist_ok=True)
     html = await page.content()
-    metadata = "<!-- url=%s title=%s -->\n" % (await page.url, await page.title())
+    metadata = "<!-- url=%s title=%s -->\n" % (page.url, await page.title())
     (d / ("%s-%d.html" % (name, int(time.time())))).write_text(metadata + html)
 
-async def healthy(page):
-    body = await page.content()
-    if "arkose" in body or "captcha" in body.lower():
-        return "captcha"
-    if "Something went wrong" in body:
-        return "error_toast"
-    if "Rate limit exceeded" in body:
-        return "ratelimit"
-    return None
+async def healthy(page, status=None):
+    return await probe(page, status)
 
 async def deindexed(anon_page, handle, tid):
     from browser import pause

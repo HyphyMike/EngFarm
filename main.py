@@ -1,4 +1,4 @@
-import asyncio, os, random, traceback
+import asyncio, os, random, time, traceback
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 
@@ -14,13 +14,23 @@ LANES = asyncio.Semaphore(3)
 ERR = {"TimeoutError": "slow", "TargetClosedError": "crash",
        "Error": "dom", "TooManyRequests": "throttle"}
 
+def cooling():
+    until = float(STORE.kv("cooldown_until") or 0)
+    left = until - time.time()
+    if left > 0:
+        print("  (X access cooldown: %s, %d min left)" %
+              (STORE.kv("cooldown_reason") or "blocked", int(left // 60)))
+        return True
+    return False
+
 async def guard(s, store):
-    if killswitch.engaged():
+    if killswitch.engaged() or cooling():
         return False
-    sig = await health.healthy(s.page)
+    sig = await health.healthy(s.page, getattr(s, "last_status", None))
     if sig:
         BACKOFF["mult"] = min(BACKOFF["mult"] * 1.8, 8)
-        print("  !! %s x%.1f" % (sig, BACKOFF["mult"]))
+        health.set_cooldown(store, sig)
+        print("  !! %s; cooling down" % sig)
         return False
     BACKOFF["mult"] = max(BACKOFF["mult"] * 0.9, 1.0)
     return True
@@ -55,9 +65,13 @@ async def lane(name, jobs_list, prime=True):
     from browser import Session
     async with LANES:
         try:
+            if cooling():
+                return
             async with Session() as s:
                 if not await s.logged_in():
-                    print("  !! %s: logged out" % name)
+                    if getattr(s, "block_signal", None):
+                        health.set_cooldown(STORE, s.block_signal)
+                    print("  !! %s: blocked or logged out" % name)
                     return
                 if prime:
                     await actions.prime_baseline(s)
@@ -88,9 +102,13 @@ async def cycle():
 
 async def cycle_analytics():
     from browser import Session
+    if cooling():
+        return
     async with LANES:
         async with Session() as s:
             if not await s.logged_in():
+                if getattr(s, "block_signal", None):
+                    health.set_cooldown(STORE, s.block_signal)
                 return
             await analytics.collect(s, STORE, 25)
             analytics.retune(STORE)
@@ -104,8 +122,12 @@ async def cycle_analytics():
 async def cycle_health():
     from playwright.async_api import async_playwright
     from browser import Session
+    if cooling():
+        return
     async with Session() as s:
         if not await s.logged_in():
+            if getattr(s, "block_signal", None):
+                health.set_cooldown(STORE, s.block_signal)
             return
         last = STORE.q1("SELECT tid FROM posted WHERE tid IS NOT NULL ORDER BY ts DESC LIMIT 1")
         if not last:

@@ -13,9 +13,8 @@ Object.defineProperty(navigator,'plugins',{get:()=>[1,2,3,4,5]});
 Object.defineProperty(navigator,'languages',{get:()=>['en-US','en']});
 """
 
-def _proxy():
-    url = os.getenv("PROXY_URL")
-    return {"server": url} if url else None
+# Persistent browser contexts cannot open the same profile concurrently.
+_PROFILE_LOCK = asyncio.Lock()
 
 async def pause(lo=None, hi=None):
     c = config.load()["budget"]
@@ -29,50 +28,65 @@ class Session:
         self._pw = None
         self.ctx = None
         self.page = None
+        self.last_status = None
+        self.block_signal = None
 
     async def __aenter__(self):
-        self._pw = await async_playwright().start()
-        self.ctx = await self._pw.chromium.launch_persistent_context(
-            self.profile,
-            headless=os.getenv("HEADLESS", "0") == "1",
-            channel="chromium",
-            user_agent=UA,
-            viewport={"width": 1280, "height": 900},
-            locale="en-US",
-            timezone_id=os.getenv("TZ_ID", "America/New_York"),
-            proxy=_proxy(),
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--disable-features=IsolateOrigins,site-per-process",
-                "--no-first-run",
-                "--no-default-browser-check",
-            ],
-        )
-        await self.ctx.add_init_script(STEALTH_JS)
-        self.page = self.ctx.pages[0] if self.ctx.pages else await self.ctx.new_page()
-        await Stealth().apply_stealth_async(self.page)
-        return self
+        await _PROFILE_LOCK.acquire()
+        try:
+            self._pw = await async_playwright().start()
+            self.ctx = await self._pw.chromium.launch_persistent_context(
+                self.profile,
+                headless=os.getenv("HEADLESS", "1") == "1",
+                user_agent=UA,
+                viewport={"width": 1280, "height": 900},
+                locale="en-US",
+                timezone_id=os.getenv("TZ_ID", "America/New_York"),
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+            await self.ctx.add_init_script(STEALTH_JS)
+            self.page = self.ctx.pages[0] if self.ctx.pages else await self.ctx.new_page()
+            await Stealth().apply_stealth_async(self.page)
+            return self
+        except BaseException:
+            try:
+                if self.ctx:
+                    await self.ctx.close()
+                if self._pw:
+                    await self._pw.stop()
+            finally:
+                _PROFILE_LOCK.release()
+            raise
 
     async def __aexit__(self, *a):
         try:
             if self.ctx:
                 await self.ctx.close()
         finally:
-            if self._pw:
-                await self._pw.stop()
+            try:
+                if self._pw:
+                    await self._pw.stop()
+            finally:
+                _PROFILE_LOCK.release()
 
     async def goto(self, url, wait="domcontentloaded"):
-        await self.page.goto(url, wait_until=wait, timeout=45000)
+        response = await self.page.goto(url, wait_until=wait, timeout=45000)
+        self.last_status = response.status if response else None
         await pause(900, 2200)
 
     async def logged_in(self):
         import health
-        sig = await health.probe(self)
-        if sig:
-            print("  !! session blocked: %s (url=%s)" % (sig, self.page.url))
-            return False
+        await self.goto("https://x.com/home")
+        self.block_signal = await health.probe(self.page, self.last_status)
         url = self.page.url
-        return "/login" not in url and "i/flow/login" not in url
+        if self.block_signal:
+            print("  !! X session blocked: %s (url=%s)" %
+                  (self.block_signal, url))
+            return False
+        if "/login" in url or "i/flow/login" in url:
+            self.block_signal = "login"
+            return False
+        return True
 
     async def type_like_human(self, text):
         for ch in text:
