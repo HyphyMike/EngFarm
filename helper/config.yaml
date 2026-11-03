@@ -1,0 +1,36 @@
+account_handle: CloutSpot
+
+# The single biggest lever. Describe how you actually write.
+voice: |
+  Dry, confident, slightly contrarian. Short sentences. No hashtags.
+  Occasional lowercase. Never opens with "Great point" or "This".
+
+llm:
+  base_url: https://api.venice.ai/api/v1
+  model: venice-uncensored
+  api_key_env: VENICE_API_KEY
+  variants: 3            # drafts generated per item, you pick or edit one
+
+topic_seeds:
+  - AI agents
+  - startup fundraising
+  - developer tooling
+
+# "Find tweets" looks here. Needs X_BEARER_TOKEN with read access.
+discovery:
+  accounts: [levelsio, paulg]
+  keywords: ["AI agents", "indie hackers"]
+  max_age_minutes: 120
+  min_likes: 20
+  per_query: 10
+
+# Applied to everything you approve. These are your own pacing rules,
+# kept well under X's limits so your timeline doesn't read as a firehose.
+posting:
+  max_posts_per_day: 8
+  max_replies_per_day: 30
+  min_gap_minutes: 20
+  # How approved replies go out:
+  #   intent = open X in your browser with the reply pre-filled; you press Post
+  #   api    = post through the X API (your developer tier must allow replies)
+  reply_mode: intent

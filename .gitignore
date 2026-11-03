@@ -1,0 +1,26 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+helper/.env.env
+
+# Browser profiles and local application data
+chrome-profile/
+chrome-amp/
+*.db
+*.sqlite
+*.sqlite3
+state.db/
+candidates/
+snapshots/
+digests/
+PAUSE/
+dump.txt
+
+# Local Python artifacts
+.venv/
+__pycache__/
+*.py[cod]
+
+# Git
+.git/

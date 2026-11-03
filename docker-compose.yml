@@ -1,0 +1,19 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HEADLESS: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./chrome-profile:/app/chrome-profile
+      - ./chrome-amp:/app/chrome-amp
+      - ./engfarm.db:/app/engfarm.db
+      - ./config.yaml:/app/config.yaml
+      - ./digests:/app/digests
+      - ./snapshots:/app/snapshots
+      - ./candidates:/app/candidates
+      - ./fixtures:/app/fixtures
+      - ./PAUSE:/app/PAUSE
+    shm_size: 1gb

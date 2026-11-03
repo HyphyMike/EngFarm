@@ -1,0 +1,50 @@
+CREATE TABLE IF NOT EXISTS posted (
+  hash TEXT PRIMARY KEY, text TEXT, fmt TEXT, tid TEXT, trend TEXT, ts REAL);
+CREATE TABLE IF NOT EXISTS replied (
+  tweet_id TEXT PRIMARY KEY, kind TEXT, trend TEXT, ts REAL);
+CREATE TABLE IF NOT EXISTS acts (kind TEXT, ts REAL);
+CREATE TABLE IF NOT EXISTS stat_events (kind TEXT, ts REAL);
+CREATE TABLE IF NOT EXISTS trends (name TEXT PRIMARY KEY, ts REAL, vol INT, vol2 INT);
+CREATE TABLE IF NOT EXISTS follows (
+  handle TEXT PRIMARY KEY, ts REAL, mutual INT DEFAULT 0, unfollowed INT DEFAULT 0);
+CREATE TABLE IF NOT EXISTS metrics (
+  tid TEXT PRIMARY KEY, fmt TEXT, json TEXT, ts REAL, settled INT DEFAULT 0);
+CREATE TABLE IF NOT EXISTS vectors (tid TEXT PRIMARY KEY, vec BLOB, ts REAL);
+CREATE TABLE IF NOT EXISTS peer_posts (hash TEXT PRIMARY KEY, handle TEXT, vec BLOB, ts REAL);
+CREATE TABLE IF NOT EXISTS threads (
+  id TEXT PRIMARY KEY, depth INT DEFAULT 0, closed INT DEFAULT 0, ts REAL);
+CREATE TABLE IF NOT EXISTS chains (
+  root TEXT PRIMARY KEY, beats TEXT, cursor INT, done INT DEFAULT 0, ts REAL);
+CREATE TABLE IF NOT EXISTS relationships (
+  handle TEXT PRIMARY KEY, score REAL DEFAULT 0, ts REAL);
+CREATE TABLE IF NOT EXISTS lessons (
+  ts REAL, text TEXT, weight REAL DEFAULT 1.0, hits INT DEFAULT 0);
+CREATE TABLE IF NOT EXISTS experiments (
+  id TEXT PRIMARY KEY, hyp TEXT, pred TEXT, result TEXT, ts REAL);
+CREATE TABLE IF NOT EXISTS claims (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT, reason TEXT,
+  status TEXT DEFAULT 'pending', expires REAL, slot INT, ts REAL);
+CREATE TABLE IF NOT EXISTS audience (
+  handle TEXT PRIMARY KEY, cluster INT, bio TEXT);
+CREATE TABLE IF NOT EXISTS peers (
+  handle TEXT PRIMARY KEY, likes INT, replies INT, ts REAL);
+CREATE TABLE IF NOT EXISTS bandit (arm TEXT PRIMARY KEY, A BLOB, b BLOB);
+CREATE TABLE IF NOT EXISTS sel_stats (name TEXT PRIMARY KEY, ok INT DEFAULT 0, fail INT DEFAULT 0);
+CREATE TABLE IF NOT EXISTS stances (
+  tid TEXT PRIMARY KEY, state TEXT, ts REAL, challenges INT DEFAULT 0);
+CREATE TABLE IF NOT EXISTS cooldowns (topic TEXT PRIMARY KEY, vec BLOB, ts REAL);
+CREATE TABLE IF NOT EXISTS plans (date TEXT PRIMARY KEY, json TEXT);
+CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS costs (kind TEXT, tokens INT, ts REAL);
+CREATE TABLE IF NOT EXISTS failures (job TEXT, kind TEXT, ts REAL, n INT);
+CREATE TABLE IF NOT EXISTS seeds (hash TEXT PRIMARY KEY, title TEXT, source TEXT, used INT DEFAULT 0);
+CREATE TABLE IF NOT EXISTS pending_send (
+  hash TEXT PRIMARY KEY, text TEXT, fmt TEXT, ts REAL, claimed INT DEFAULT 0);
+CREATE TABLE IF NOT EXISTS outbox (
+  id TEXT PRIMARY KEY, text TEXT, fmt TEXT, state TEXT DEFAULT 'intended',
+  tid TEXT, ts REAL, confirmed REAL, trend TEXT);
+CREATE TABLE IF NOT EXISTS job_cost (job TEXT PRIMARY KEY, avg REAL DEFAULT 6);
+CREATE TABLE IF NOT EXISTS journal (cycle TEXT, lane TEXT, job TEXT, state TEXT, ts REAL);
+CREATE INDEX IF NOT EXISTS acts_ts ON acts(kind, ts);
+CREATE INDEX IF NOT EXISTS stat_ts ON stat_events(kind, ts);
+CREATE INDEX IF NOT EXISTS outbox_state ON outbox(state, ts);

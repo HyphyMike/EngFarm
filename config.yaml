@@ -1,0 +1,52 @@
+account_handle: SeeTheLightER
+profile_dir: ./chrome-profile
+voice: |
+  Dry, confident, slightly contrarian. Short sentences. Never starts with
+  "Great point" or "This". No hashtags. Occasional lowercase. Max 240 chars.
+model: venice-uncensored
+
+budget:
+  actions_per_hour: 90
+  actions_per_day: 700
+  pause_min_ms: 1400
+  pause_max_ms: 5200
+
+trends:
+  enabled: true
+  refresh_minutes: 25
+  max_active_trends: 3
+  min_post_volume: 2000
+  replies_per_trend: 2
+  posts_per_trend: 1
+  seeds:
+    - AI agents
+    - startup fundraising
+    - developer tooling
+
+sniping:
+  max_age_minutes: 10
+  min_likes_for_reply: 2
+  reply_ratio_cap: 0.35
+  max_replies_per_hour: 7
+  max_replies_per_day: 45
+
+posting:
+  max_per_day: 5
+  min_gap_minutes: 100
+  mix:
+    bait_question: 40
+    hot_take: 35
+    quote_tweet: 25
+
+follows:
+  enabled: true
+  sources:
+    - levelsio
+    - paulg
+  max_per_day: 40
+  max_total_ratio: 1.15
+  unfollow_after_days: 4
+  unfollow_nonmutual_only: true
+  whitelist:
+    - levelsio
+    - paulg

@@ -1,0 +1,6 @@
+chrome-profile/
+chrome-amp/
+.venv/
+__pycache__/
+*.py[cod]
+.git/
