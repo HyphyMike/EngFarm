@@ -1,4 +1,5 @@
 import pathlib, time
+import killswitch
 
 SELECTORS = {
     "tweet": ['article[data-testid="tweet"]', 'article[role="article"]', '[role="article"]'],
@@ -13,15 +14,19 @@ SELECTORS = {
     "usercell": ['[data-testid="UserCell"]', 'div[data-testid="cellInnerDiv"]'],
     "analytics": ['[aria-label*="View post analytics"]'],
     "bookmark": ['[data-testid="bookmark"]'],
-    "notification": ['[data-testid="notification"]', 'article[data-testid="tweet"]', 'article[role="article"]'],
+    "notification": ['[data-testid="notification"]', 'article[data-testid="tweet"]',
+                     'article[role="article"]'],
 }
 
 QUARANTINE_AFTER = 2
-COOLDOWN = {"http403": 3600, "ratelimit": 1800, "captcha": 1200,
-            "empty": 900, "neterr": 300, "error_toast": 600}
 
-async def probe(page, status=None):
+COOLDOWN = {"http403": 3600, "ratelimit": 1800, "captcha": 1200,
+            "empty": 900, "neterr": 300, "error_toast": 600, "login": 21600}
+
+async def probe(page, status=None, last_url=None):
     """Classify an already-loaded page; never retries a blocked request."""
+    if last_url is not None and page.url != last_url:
+        status = None  # recorded status belongs to a previous navigation
     if status == 403:
         return "http403"
     if status == 429:
@@ -44,9 +49,13 @@ async def probe(page, status=None):
 
 def set_cooldown(store, signature):
     seconds = COOLDOWN.get(signature)
-    if seconds:
-        store.set_kv("cooldown_until", str(time.time() + seconds))
-        store.set_kv("cooldown_reason", signature)
+    if not seconds:
+        return
+    store.set_kv("cooldown_until", str(time.time() + seconds))
+    store.set_kv("cooldown_reason", signature)
+    if signature == "login":
+        # logged out needs a human, not a nap
+        killswitch.trip("logged out")
 
 async def pick(store, page, name):
     if store.kv("quarantine:" + name):
@@ -88,8 +97,8 @@ async def dump(page, name):
     metadata = "<!-- url=%s title=%s -->\n" % (page.url, await page.title())
     (d / ("%s-%d.html" % (name, int(time.time())))).write_text(metadata + html)
 
-async def healthy(page, status=None):
-    return await probe(page, status)
+async def healthy(page, status=None, last_url=None):
+    return await probe(page, status, last_url)
 
 async def deindexed(anon_page, handle, tid):
     from browser import pause
