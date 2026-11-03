@@ -26,7 +26,8 @@ def cooling():
 async def guard(s, store):
     if killswitch.engaged() or cooling():
         return False
-    sig = await health.healthy(s.page, getattr(s, "last_status", None))
+    sig = await health.healthy(s.page, getattr(s, "last_status", None),
+                               getattr(s, "last_url", None))
     if sig:
         BACKOFF["mult"] = min(BACKOFF["mult"] * 1.8, 8)
         health.set_cooldown(store, sig)
@@ -84,17 +85,36 @@ async def lane(name, jobs_list, prime=True):
             print("  !! lane %s: %s: %s" % (name, type(e).__name__, e))
             traceback.print_exc()
 
+async def preflight():
+    """One probe before fanning out, so a block doesn't cost four launches."""
+    from browser import Session
+    async with LANES:
+        async with Session() as s:
+            ok = await s.logged_in()
+            if not ok and getattr(s, "block_signal", None):
+                health.set_cooldown(STORE, s.block_signal)
+            return ok
+
 async def cycle():
     import journal
     BUD.reset()
     journal.cycle(STORE)
     global LANES
     LANES = asyncio.Semaphore(resources.lanes())
+
+    if cooling():
+        return
+    if not await preflight():
+        print("  (preflight failed; cycle skipped)")
+        return
+
     lanes = [
-        ("content", [("trends", jobs.trends_job), ("post", jobs.post_job)], True),
+        ("content", [("trends", jobs.trends_job),
+                     ("post", jobs.post_job),
+                     ("reconcile", jobs.reconcile_job)], True),
         ("conversation", [("conversation", jobs.conversation_job)], True),
-        ("threads", [("chain_repair", jobs.chain_repair_job), ("thread", jobs.thread_job)], True),
-        ("reconcile", [("reconcile", jobs.reconcile_job)], False),
+        ("threads", [("chain_repair", jobs.chain_repair_job),
+                     ("thread", jobs.thread_job)], True),
     ]
     if random.random() < 0.5:
         lanes.append(("tail", [("misc", jobs.misc_job), ("follows", jobs.follows_job)], False))
@@ -121,7 +141,7 @@ async def cycle_analytics():
 
 async def cycle_health():
     from playwright.async_api import async_playwright
-    from browser import Session
+    from browser import Session, UA, _proxy
     if cooling():
         return
     async with Session() as s:
@@ -133,7 +153,8 @@ async def cycle_health():
         if not last:
             return
     pw = await async_playwright().start()
-    ctx = await (await pw.chromium.launch(headless=True)).new_context()
+    ctx = await (await pw.chromium.launch(
+        headless=True, channel="chromium")).new_context(user_agent=UA, proxy=_proxy())
     if await health.deindexed(await ctx.new_page(), config.load()["account_handle"], last[0]):
         print("!! DEINDEXED")
         killswitch.trip("deindexed")
